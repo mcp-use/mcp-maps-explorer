@@ -1,6 +1,13 @@
 import { MCPServer, object, text, widget } from "mcp-use/server";
 import { z } from "zod";
-import { markerSchema } from "./resources/map-view/types";
+
+const markerSchema = z.object({
+  lat: z.number().describe("Latitude"),
+  lng: z.number().describe("Longitude"),
+  title: z.string().describe("Marker title"),
+  description: z.string().optional().describe("Marker description"),
+  color: z.enum(["red", "blue", "green", "orange", "purple"]).optional().describe("Marker color"),
+});
 
 const server = new MCPServer({
   name: "maps-explorer",
