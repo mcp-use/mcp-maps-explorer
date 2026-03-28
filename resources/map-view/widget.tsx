@@ -6,8 +6,6 @@ import {
   type WidgetMetadata,
 } from "mcp-use/react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
 import "../styles.css";
 import { propSchema, type MapViewProps, type Marker } from "./types";
 
@@ -20,14 +18,10 @@ export const widgetMetadata: WidgetMetadata = {
     invoking: "Loading map...",
     invoked: "Map ready",
     csp: {
-      resourceDomains: [
-        "https://tile.openstreetmap.org",
-        "https://*.tile.openstreetmap.org",
-      ],
-      connectDomains: [
-        "https://tile.openstreetmap.org",
-        "https://*.tile.openstreetmap.org",
-      ],
+      // ChatGPT ignores wildcard entries in widget CSP; use exact origins only.
+      resourceDomains: ["https://tile.openstreetmap.org"],
+      connectDomains: ["https://tile.openstreetmap.org"],
+      redirectDomains: ["https://www.google.com"],
     },
   },
 };
@@ -68,7 +62,8 @@ const MapView: React.FC = () => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const markersLayerRef = useRef<any>(null);
-  const leafletReady = useRef(false);
+  const leafletRef = useRef<typeof import("leaflet") | null>(null);
+  const leafletLoading = useRef(false);
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const [selectedMarker, setSelectedMarker] = useState<Marker | null>(null);
   const [viewBounds, setViewBounds] = useState<string>("");
@@ -76,9 +71,15 @@ const MapView: React.FC = () => {
   const placeDetails = placeData?.structuredContent as PlaceDetails | undefined;
 
   useEffect(() => {
-    if (leafletReady.current) return;
-    leafletReady.current = true;
-    setScriptLoaded(true);
+    if (leafletLoading.current) return;
+    leafletLoading.current = true;
+    //@ts-ignore
+    Promise.all([import("leaflet"), import("leaflet/dist/leaflet.css")]).then(
+      ([L]) => {
+        leafletRef.current = L;
+        setScriptLoaded(true);
+      }
+    );
   }, []);
 
   const updateBounds = useCallback(() => {
@@ -91,8 +92,8 @@ const MapView: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!scriptLoaded || !mapContainerRef.current || isPending) return;
-    if (!L) return;
+    const L = leafletRef.current;
+    if (!scriptLoaded || !mapContainerRef.current || isPending || !L) return;
 
     const { center, zoom } = props;
 
@@ -121,7 +122,8 @@ const MapView: React.FC = () => {
   }, [scriptLoaded, isPending, props?.center, props?.zoom, updateBounds]);
 
   useEffect(() => {
-    if (!mapInstanceRef.current || !markersLayerRef.current || isPending) return;
+    const L = leafletRef.current;
+    if (!mapInstanceRef.current || !markersLayerRef.current || isPending || !L) return;
     const { markers } = props;
 
     markersLayerRef.current.clearLayers();
