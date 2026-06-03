@@ -16,7 +16,7 @@ importers:
         specifier: ^1.9.4
         version: 1.9.4
       mcp-use:
-        specifier: 1.28.0
+        specifier: latest
         version: 1.28.0(c8d1dbe047b01efce662ed89c7141ad9)
       react:
         specifier: ^19.2.4
