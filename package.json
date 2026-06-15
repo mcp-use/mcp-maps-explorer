@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "leaflet": "^1.9.4",
-    "mcp-use": "^1.29.1",
+    "mcp-use": "^1.32.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "tailwindcss": "^4.2.0",
