@@ -11,7 +11,7 @@ export const markerSchema = z.object({
     .describe("Marker color"),
 });
 
-export const propSchema = z.object({
+export const mapSchema = z.object({
   title: z.string().optional().describe("Map title"),
   center: z
     .object({ lat: z.number(), lng: z.number() })
@@ -20,5 +20,5 @@ export const propSchema = z.object({
   markers: z.array(markerSchema).describe("Map markers"),
 });
 
-export type MapViewProps = z.infer<typeof propSchema>;
+export type MapViewProps = z.infer<typeof mapSchema>;
 export type Marker = z.infer<typeof markerSchema>;
