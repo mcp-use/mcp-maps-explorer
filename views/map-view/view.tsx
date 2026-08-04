@@ -1,30 +1,13 @@
 import {
-  McpUseProvider,
   ModelContext,
   useCallTool,
-  useWidget,
-  type WidgetMetadata,
+  useDisplayMode,
+  useOpenExternal,
+  useToolContext,
 } from "mcp-use/react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import "../styles.css";
-import { propSchema, type MapViewProps, type Marker } from "./types";
-
-export const widgetMetadata: WidgetMetadata = {
-  description: "Interactive Leaflet map with markers, popups, and place details",
-  props: propSchema,
-  exposeAsTool: false,
-  metadata: {
-    prefersBorder: true,
-    invoking: "Loading map...",
-    invoked: "Map ready",
-    csp: {
-      // ChatGPT ignores wildcard entries in widget CSP; use exact origins only.
-      resourceDomains: ["https://tile.openstreetmap.org"],
-      connectDomains: ["https://tile.openstreetmap.org"],
-      redirectDomains: ["https://www.google.com"],
-    },
-  },
-};
+import { type MapViewProps, type Marker } from "./types";
 
 const MARKER_COLORS: Record<string, string> = {
   red: "#e74c3c",
@@ -44,14 +27,12 @@ type PlaceDetails = {
 };
 
 const MapView: React.FC = () => {
-  const {
-    props,
-    isPending,
-    displayMode,
-    requestDisplayMode,
-    openExternal,
-    theme,
-  } = useWidget<MapViewProps>();
+  const view = useToolContext<"show-map">();
+  const { displayMode, requestDisplayMode } = useDisplayMode();
+  const openExternal = useOpenExternal();
+  const isPending = view.status === "pending";
+  const props = (view.status === "ready" ? view.toolOutput : view.toolInput) as MapViewProps | undefined;
+  const map = props ?? { center: { lat: 0, lng: 0 }, zoom: 5, markers: [] };
 
   const {
     callTool: getPlaceDetails,
@@ -95,7 +76,7 @@ const MapView: React.FC = () => {
     const L = leafletRef.current;
     if (!scriptLoaded || !mapContainerRef.current || isPending || !L) return;
 
-    const { center, zoom } = props;
+    const { center, zoom } = map;
 
     if (!mapInstanceRef.current) {
       const map = L.map(mapContainerRef.current, {
@@ -119,12 +100,12 @@ const MapView: React.FC = () => {
     } else {
       mapInstanceRef.current.setView([center.lat, center.lng], zoom);
     }
-  }, [scriptLoaded, isPending, props?.center, props?.zoom, updateBounds]);
+  }, [scriptLoaded, isPending, map.center, map.zoom, updateBounds]);
 
   useEffect(() => {
     const L = leafletRef.current;
     if (!mapInstanceRef.current || !markersLayerRef.current || isPending || !L) return;
-    const { markers } = props;
+    const { markers } = map;
 
     markersLayerRef.current.clearLayers();
 
@@ -155,7 +136,7 @@ const MapView: React.FC = () => {
     });
 
     updateBounds();
-  }, [isPending, props?.markers, updateBounds]);
+  }, [isPending, map.markers, updateBounds]);
 
   useEffect(() => {
     if (!mapInstanceRef.current) return;
@@ -165,7 +146,7 @@ const MapView: React.FC = () => {
   const handleDirections = useCallback(
     (marker: Marker) => {
       const url = `https://www.google.com/maps/dir/?api=1&destination=${marker.lat},${marker.lng}`;
-      openExternal(url);
+      void openExternal({ url });
     },
     [openExternal]
   );
@@ -173,10 +154,13 @@ const MapView: React.FC = () => {
   const isFullscreen = displayMode === "fullscreen";
   const mapHeight = isFullscreen ? "calc(100vh - 60px)" : "400px";
 
+  if (view.status === "error") {
+    return <div className="p-6 text-sm text-red-600" role="alert">{view.error.message}</div>;
+  }
+
   if (isPending) {
     return (
-      <McpUseProvider autoSize>
-        <div className="p-6">
+      <div className="p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="h-5 w-5 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
             <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -187,15 +171,14 @@ const MapView: React.FC = () => {
             className="rounded-xl bg-gray-100 dark:bg-gray-800 animate-pulse"
             style={{ height: "360px" }}
           />
-        </div>
-      </McpUseProvider>
+      </div>
     );
   }
 
-  const { title, markers } = props;
+  const { title, markers } = map;
 
   return (
-    <McpUseProvider autoSize>
+    <>
       <ModelContext content={`Map viewport: ${viewBounds}`}>
         {selectedMarker && (
           <ModelContext
@@ -220,14 +203,14 @@ const MapView: React.FC = () => {
           <div className="flex items-center gap-1.5">
             {!isFullscreen ? (
               <button
-                onClick={() => requestDisplayMode("fullscreen")}
+                onClick={() => void requestDisplayMode({ mode: "fullscreen" })}
                 className="px-2.5 py-1 text-xs rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-700 dark:text-gray-300"
               >
                 Fullscreen
               </button>
             ) : (
               <button
-                onClick={() => requestDisplayMode("inline")}
+                onClick={() => void requestDisplayMode({ mode: "inline" })}
                 className="px-2.5 py-1 text-xs rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-700 dark:text-gray-300"
               >
                 Exit
@@ -327,7 +310,7 @@ const MapView: React.FC = () => {
           )}
         </div>
       </div>
-    </McpUseProvider>
+    </>
   );
 };
 
